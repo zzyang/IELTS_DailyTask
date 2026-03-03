@@ -224,6 +224,10 @@ body {
   font-size: 0.95rem;
 }
 
+#wordMask {
+  color: var(--ok);
+}
+
 .input-label {
   display: block;
   margin: 16px 0 6px;

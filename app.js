@@ -33,9 +33,7 @@
   const promptText = document.getElementById('promptText');
 
   const spellingHints = document.getElementById('spellingHints');
-  const firstLetter = document.getElementById('firstLetter');
-  const lastLetter = document.getElementById('lastLetter');
-  const wordLength = document.getElementById('wordLength');
+  const wordMask = document.getElementById('wordMask');
 
   const spellingWrap = document.getElementById('spellingWrap');
   const answerInput = document.getElementById('answerInput');
@@ -110,9 +108,12 @@
     return word.trim().toLowerCase().replace(/\s+/g, ' ');
   }
 
-  function alphaLength(word) {
-    const letters = word.match(/[A-Za-z]/g);
-    return letters ? letters.length : word.length;
+  function buildWordMask(word) {
+    if (!word || !/[A-Za-z]/.test(word)) return '-';
+    return word.replace(/[A-Za-z]+/g, (seg) => {
+      if (seg.length <= 2) return seg;
+      return seg[0] + '_'.repeat(seg.length - 2) + seg[seg.length - 1];
+    });
   }
 
   function formatDuration(ms) {
@@ -232,7 +233,7 @@
       sourceDate: targetDateKey,
       taskDate: targetDateKey,
       label: '新词: 中文拼英文',
-      desc: '30词，给中文输入英文，含首尾字母和长度提示',
+      desc: '30词，给中文输入英文',
       words: targetWords,
     });
 
@@ -496,9 +497,7 @@
     spellingWrap.classList.remove('hidden');
     mcqWrap.classList.add('hidden');
 
-    firstLetter.textContent = q.word[0] || '-';
-    lastLetter.textContent = q.word[q.word.length - 1] || '-';
-    wordLength.textContent = String(alphaLength(q.word));
+    wordMask.textContent = buildWordMask(q.word);
 
     answerInput.value = '';
     answerInput.focus();
