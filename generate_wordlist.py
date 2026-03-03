@@ -9,15 +9,24 @@ DST = BASE / 'wordlist.js'
 line_re = re.compile(r"^([A-Za-z][A-Za-z*'\- ]*[A-Za-z*'])\s{2,}(.+)$")
 word_re = re.compile(r"^[A-Za-z][A-Za-z'\- ]+$")
 pos_re = re.compile(r"\b(?:n|v|vi|vt|adj|a|ad|adv|conj|pron|prep|excl|num|int)\.(?:\s*/\s*(?:n|v|vi|vt|adj|a|ad|adv|conj|pron|prep|excl|num|int)\.)*", flags=re.I)
+list_re = re.compile(r"^Word List\s+(\d{1,2})$", flags=re.I)
 
 entries = []
-seen = set()
+current_list_no = None
 
 for raw in SRC.read_text(encoding='utf-8', errors='ignore').splitlines():
     line = raw.strip()
     if not line:
         continue
-    if line.startswith('Word List') or line.startswith('README'):
+    if line.startswith('README'):
+        continue
+
+    list_match = list_re.match(line)
+    if list_match:
+        current_list_no = int(list_match.group(1))
+        continue
+
+    if current_list_no is None:
         continue
 
     m = line_re.match(line)
@@ -56,13 +65,14 @@ for raw in SRC.read_text(encoding='utf-8', errors='ignore').splitlines():
     if not meaning:
         continue
 
-    key = word.lower()
-    if key in seen:
-        continue
-    seen.add(key)
-    entries.append({'word': word, 'meaning': meaning, 'phonetic': phonetic, 'pos': pos})
-
-entries.sort(key=lambda x: x['word'].lower())
+    entries.append({
+        'list_no': current_list_no,
+        'list_label': f'Word List {current_list_no:02d}',
+        'word': word,
+        'meaning': meaning,
+        'phonetic': phonetic,
+        'pos': pos,
+    })
 
 content = 'window.WORD_BANK = ' + json.dumps(entries, ensure_ascii=False, separators=(',', ':')) + ';\n'
 DST.write_text(content, encoding='utf-8')

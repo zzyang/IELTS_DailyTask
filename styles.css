@@ -354,11 +354,6 @@ button {
   box-shadow: 0 8px 18px rgba(35, 159, 223, 0.3);
 }
 
-button.secondary {
-  background: rgba(255, 255, 255, 0.68);
-  color: var(--ink);
-  box-shadow: none;
-}
 
 button:disabled {
   opacity: 0.5;

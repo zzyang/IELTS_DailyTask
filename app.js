@@ -1,14 +1,14 @@
 (() => {
-  const DAILY_COUNT = 30;
   const MCQ_COUNT = 6;
   const REVIEW_INTERVALS = [1, 3, 7, 14, 30];
-  const STORAGE_KEY = 'ielts_task_state_v1';
+  const STORAGE_KEY = 'ielts_task_state_v2';
   const pool = Array.isArray(window.WORD_BANK) ? window.WORD_BANK : [];
+  const listIds = [...new Set(pool.map((x) => Number(x.list_no)).filter((x) => Number.isInteger(x)))].sort((a, b) => a - b);
 
   const dateLabel = document.getElementById('dateLabel');
-
   const todayTabBtn = document.getElementById('todayTabBtn');
   const historyTabBtn = document.getElementById('historyTabBtn');
+  const statsTabBtn = document.getElementById('statsTabBtn');
 
   const taskBoard = document.getElementById('taskBoard');
   const boardSummary = document.getElementById('boardSummary');
@@ -17,13 +17,15 @@
   const hideTodayWordsBtn = document.getElementById('hideTodayWordsBtn');
   const todayWordsPanel = document.getElementById('todayWordsPanel');
   const todayWordsList = document.getElementById('todayWordsList');
-  const openHistoryBtn = document.getElementById('openHistoryBtn');
 
   const historyBoard = document.getElementById('historyBoard');
   const historySummary = document.getElementById('historySummary');
-  const historyDateInput = document.getElementById('historyDateInput');
   const historyPendingList = document.getElementById('historyPendingList');
-  const historyDoneList = document.getElementById('historyDoneList');
+  const statsBoard = document.getElementById('statsBoard');
+  const statsSummary = document.getElementById('statsSummary');
+  const statsList = document.getElementById('statsList');
+  const historyDateInput = document.getElementById('historyDateInput');
+  const reviewSuggestList = document.getElementById('reviewSuggestList');
 
   const quizCard = document.getElementById('quizCard');
   const resultCard = document.getElementById('resultCard');
@@ -38,7 +40,6 @@
 
   const spellingHints = document.getElementById('spellingHints');
   const wordMask = document.getElementById('wordMask');
-
   const spellingWrap = document.getElementById('spellingWrap');
   const answerInput = document.getElementById('answerInput');
   const mcqWrap = document.getElementById('mcqWrap');
@@ -74,61 +75,8 @@
     return Math.round(ms / 86400000);
   }
 
-  function hashString(str) {
-    let h = 1779033703 ^ str.length;
-    for (let i = 0; i < str.length; i += 1) {
-      h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
-      h = (h << 13) | (h >>> 19);
-    }
-    return () => {
-      h = Math.imul(h ^ (h >>> 16), 2246822507);
-      h = Math.imul(h ^ (h >>> 13), 3266489909);
-      h ^= h >>> 16;
-      return h >>> 0;
-    };
-  }
-
-  function mulberry32(seed) {
-    return () => {
-      let t = (seed += 0x6d2b79f5);
-      t = Math.imul(t ^ (t >>> 15), t | 1);
-      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-  }
-
-  function shuffleBySeed(arr, seedText) {
-    const out = arr.slice();
-    const seed = hashString(seedText)();
-    const rnd = mulberry32(seed);
-    for (let i = out.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(rnd() * (i + 1));
-      [out[i], out[j]] = [out[j], out[i]];
-    }
-    return out;
-  }
-
   function normalize(word) {
     return word.trim().toLowerCase().replace(/\s+/g, ' ');
-  }
-
-  function buildWordMask(word) {
-    if (!word || !/[A-Za-z]/.test(word)) return '-';
-    return word.replace(/[A-Za-z]+/g, (seg) => {
-      if (seg.length <= 2) return seg;
-      return seg[0] + '_'.repeat(seg.length - 2) + seg[seg.length - 1];
-    });
-  }
-
-  function formatDuration(ms) {
-    const totalSec = Math.max(0, Math.floor(ms / 1000));
-    const h = Math.floor(totalSec / 3600);
-    const m = Math.floor((totalSec % 3600) / 60);
-    const s = totalSec % 60;
-    if (h > 0) {
-      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-    }
-    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   }
 
   function escapeHTML(text) {
@@ -140,6 +88,14 @@
       .replace(/'/g, '&#39;');
   }
 
+  function buildWordMask(word) {
+    if (!word || !/[A-Za-z]/.test(word)) return '-';
+    return word.replace(/[A-Za-z]+/g, (seg) => {
+      if (seg.length <= 2) return seg;
+      return seg[0] + '_'.repeat(seg.length - 2) + seg[seg.length - 1];
+    });
+  }
+
   function lexMeta(q) {
     const parts = [];
     if (q.phonetic) parts.push(q.phonetic);
@@ -147,159 +103,71 @@
     return parts.join('  ');
   }
 
-  function loadState() {
-    const fallback = {
-      schedule: {
-        order: [],
-        cursor: 0,
-        cycle: 0,
-      },
-      dailySets: {},
-      taskProgress: {},
-    };
+  function formatDuration(ms) {
+    const totalSec = Math.max(0, Math.floor(ms / 1000));
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (h > 0) return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
 
+  function randomShuffle(arr) {
+    const out = arr.slice();
+    for (let i = out.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  }
+
+  function sameOrder(a, b) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i += 1) if (a[i] !== b[i]) return false;
+    return true;
+  }
+
+  function getListLabel(listId) {
+    return `Word List ${String(listId).padStart(2, '0')}`;
+  }
+
+  function getWordsByList(listId) {
+    return pool.filter((item) => Number(item.list_no) === Number(listId));
+  }
+
+  function loadState() {
+    const fallback = { anchorDate: '', taskProgress: {} };
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return fallback;
       const parsed = JSON.parse(raw);
       return {
-        schedule: {
-          order: Array.isArray(parsed.schedule?.order) ? parsed.schedule.order : [],
-          cursor: Number.isInteger(parsed.schedule?.cursor) ? parsed.schedule.cursor : 0,
-          cycle: Number.isInteger(parsed.schedule?.cycle) ? parsed.schedule.cycle : 0,
-        },
-        dailySets: parsed.dailySets && typeof parsed.dailySets === 'object' ? parsed.dailySets : {},
+        anchorDate: typeof parsed.anchorDate === 'string' ? parsed.anchorDate : '',
         taskProgress: parsed.taskProgress && typeof parsed.taskProgress === 'object' ? parsed.taskProgress : {},
       };
-    } catch (e) {
+    } catch {
       return fallback;
     }
   }
 
   const state = loadState();
-
   function saveState() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
-  function ensureOrder() {
-    if (state.schedule.order.length === pool.length) return;
-    const indexes = Array.from({ length: pool.length }, (_, i) => i);
-    state.schedule.order = shuffleBySeed(indexes, `cycle-${state.schedule.cycle}`);
-    state.schedule.cursor = 0;
-  }
-
-  function ensureDailySet(dateKey) {
-    if (Array.isArray(state.dailySets[dateKey]) && state.dailySets[dateKey].length) {
-      return state.dailySets[dateKey];
-    }
-
-    ensureOrder();
-    const set = [];
-    const used = new Set();
-
-    while (set.length < Math.min(DAILY_COUNT, pool.length)) {
-      if (state.schedule.cursor >= state.schedule.order.length) {
-        state.schedule.cycle += 1;
-        state.schedule.order = shuffleBySeed(
-          Array.from({ length: pool.length }, (_, i) => i),
-          `cycle-${state.schedule.cycle}`,
-        );
-        state.schedule.cursor = 0;
-      }
-
-      const idx = state.schedule.order[state.schedule.cursor];
-      state.schedule.cursor += 1;
-
-      if (!used.has(idx)) {
-        used.add(idx);
-        set.push(idx);
-      }
-    }
-
-    state.dailySets[dateKey] = set;
-    saveState();
-    return set;
-  }
-
-  function getWordsByDate(dateKey) {
-    const indexes = ensureDailySet(dateKey);
-    return indexes.map((i) => pool[i]).filter(Boolean);
-  }
-
-  function buildTasksForDate(targetDateKey) {
-    const tasks = [];
-    const targetWords = getWordsByDate(targetDateKey);
-
-    tasks.push({
-      id: `${targetDateKey}|new|spell`,
-      type: 'spell',
-      sourceDate: targetDateKey,
-      taskDate: targetDateKey,
-      label: '新词: 中文拼英文',
-      desc: '30词，给中文输入英文',
-      words: targetWords,
-    });
-
-    tasks.push({
-      id: `${targetDateKey}|new|choice`,
-      type: 'choice',
-      sourceDate: targetDateKey,
-      taskDate: targetDateKey,
-      label: '新词: 英文选中文',
-      desc: '30词，英文题干，6选1（选项来自这30词）',
-      words: targetWords,
-    });
-
-    const allDates = Object.keys(state.dailySets).filter((k) => k < targetDateKey).sort();
-    allDates.forEach((sourceDate) => {
-      const gap = diffDays(sourceDate, targetDateKey);
-      if (!REVIEW_INTERVALS.includes(gap)) return;
-      const words = getWordsByDate(sourceDate);
-
-      tasks.push({
-        id: `${targetDateKey}|review|spell|${sourceDate}`,
-        type: 'spell',
-        sourceDate,
-        taskDate: targetDateKey,
-        label: `复习(${sourceDate}): 中文拼英文`,
-        desc: `遗忘曲线第 ${gap} 天复习`,
-        words,
-      });
-
-      tasks.push({
-        id: `${targetDateKey}|review|choice|${sourceDate}`,
-        type: 'choice',
-        sourceDate,
-        taskDate: targetDateKey,
-        label: `复习(${sourceDate}): 英文选中文`,
-        desc: `遗忘曲线第 ${gap} 天复习`,
-        words,
-      });
-    });
-
-    return tasks;
-  }
-
   const today = new Date();
   const todayKey = toDateKey(today);
-  let activeView = 'today';
-  let historyDateKey = todayKey;
-  let session = null;
-  let timerInterval = null;
-  let todayWordsVisible = false;
-  const lastRunOrderByTask = {};
-
-  dateLabel.textContent = `日期：${today.toLocaleDateString('zh-CN')}`;
-  historyDateInput.value = todayKey;
-
-  if (!pool.length) {
-    taskBoard.classList.remove('hidden');
-    taskList.innerHTML = '<p>词库加载失败，请检查 wordlist.js。</p>';
-    return;
+  if (!state.anchorDate) {
+    state.anchorDate = todayKey;
+    saveState();
   }
 
-  ensureDailySet(todayKey);
+  function getTodayListId() {
+    if (!listIds.length) return null;
+    const offset = diffDays(state.anchorDate, todayKey);
+    const idx = ((offset % listIds.length) + listIds.length) % listIds.length;
+    return listIds[idx];
+  }
 
   function getTaskDone(taskId) {
     return Boolean(state.taskProgress[taskId]?.done);
@@ -316,104 +184,81 @@
     saveState();
   }
 
-  function renderTaskItems(listEl, tasks, emptyText, sourceView, sourceDateKey) {
-    listEl.innerHTML = '';
-    if (!tasks.length) {
-      listEl.innerHTML = `<p class="note">${emptyText}</p>`;
-      return;
-    }
+  function todayTasks() {
+    const listId = getTodayListId();
+    const label = getListLabel(listId || 0);
+    const words = listId ? getWordsByList(listId) : [];
+    return [
+      {
+        id: `${todayKey}|new|spell|${listId}`,
+        type: 'spell',
+        sourceDate: todayKey,
+        label: '拼写测试',
+        desc: `${label} | ${words.length}词`,
+        words,
+      },
+      {
+        id: `${todayKey}|new|choice|${listId}`,
+        type: 'choice',
+        sourceDate: todayKey,
+        label: '词义测试',
+        desc: `${label} | ${words.length}词，6选1`,
+        words,
+      },
+    ];
+  }
 
-    tasks.forEach((task) => {
-      const done = getTaskDone(task.id);
-      const wrapper = document.createElement('div');
-      wrapper.className = 'task-item';
-      let reviewWordsPanel = null;
-
-      const top = document.createElement('div');
-      top.className = 'task-top';
-
-      const name = document.createElement('div');
-      name.className = 'task-name';
-      name.textContent = task.label;
-
-      const tag = document.createElement('span');
-      tag.className = `tag${done ? ' done' : ''}`;
-      tag.textContent = done ? '已完成' : '待完成';
-
-      top.appendChild(name);
-      top.appendChild(tag);
-
-      const meta = document.createElement('div');
-      meta.className = 'task-meta';
-      meta.textContent = `${task.desc} | 词数: ${task.words.length}`;
-
-      const btnRow = document.createElement('div');
-      btnRow.className = 'btn-row';
-
-      const btn = document.createElement('button');
-      btn.className = done ? 'secondary' : '';
-      btn.textContent = done ? '重做任务' : '开始任务';
-      btn.addEventListener('click', () => startTask(task, sourceView, sourceDateKey));
-      btnRow.appendChild(btn);
-
-      if (task.id.includes('|review|')) {
-        const reviewWordsBtn = document.createElement('button');
-        reviewWordsBtn.type = 'button';
-        reviewWordsBtn.className = 'secondary';
-        reviewWordsBtn.textContent = '复习单词';
-        btnRow.appendChild(reviewWordsBtn);
-
-        reviewWordsPanel = document.createElement('div');
-        reviewWordsPanel.className = 'task-words-panel hidden';
-        const reviewWordsList = document.createElement('div');
-        reviewWordsList.className = 'today-words-list';
-        reviewWordsPanel.appendChild(reviewWordsList);
-
-        reviewWordsBtn.addEventListener('click', () => {
-          const isHidden = reviewWordsPanel.classList.contains('hidden');
-          if (isHidden) {
-            reviewWordsList.innerHTML = '';
-            task.words.forEach((item, idx) => {
-              const div = document.createElement('div');
-              div.className = 'today-word-item';
-              div.innerHTML = `
-                <div><span class="w">${idx + 1}. ${escapeHTML(item.word)}</span></div>
-                <div class="meta">${escapeHTML(item.phonetic || '-')}  ${escapeHTML(item.pos || '-')}</div>
-                <div>${escapeHTML(item.meaning)}</div>
-              `;
-              reviewWordsList.appendChild(div);
-            });
-            reviewWordsPanel.classList.remove('hidden');
-            reviewWordsBtn.textContent = '收起复习单词';
-          } else {
-            reviewWordsPanel.classList.add('hidden');
-            reviewWordsBtn.textContent = '复习单词';
-          }
-        });
-      }
-
-      wrapper.appendChild(top);
-      wrapper.appendChild(meta);
-      wrapper.appendChild(btnRow);
-      if (reviewWordsPanel) wrapper.appendChild(reviewWordsPanel);
-      listEl.appendChild(wrapper);
+  function reviewTaskGroups() {
+    return listIds.map((listId) => {
+      const words = getWordsByList(listId);
+      const label = getListLabel(listId);
+      return {
+        listId,
+        label,
+        words,
+        spellTask: {
+          id: `review|${listId}|spell`,
+          type: 'spell',
+          sourceDate: label,
+          label: `拼写测试(${label})`,
+          desc: `${label} | ${words.length}词`,
+          words,
+        },
+        choiceTask: {
+          id: `review|${listId}|choice`,
+          type: 'choice',
+          sourceDate: label,
+          label: `词义测试(${label})`,
+          desc: `${label} | ${words.length}词，6选1`,
+          words,
+        },
+      };
     });
   }
 
-  function renderTodayBoard() {
-    const tasks = buildTasksForDate(todayKey);
-    const doneCount = tasks.filter((t) => getTaskDone(t.id)).length;
-    boardSummary.textContent = `完成 ${doneCount} / ${tasks.length}`;
-    renderTaskItems(taskList, tasks, '今天暂无任务。', 'today', todayKey);
+  let activeView = 'today';
+  let session = null;
+  let timerInterval = null;
+  let todayWordsVisible = false;
+  let selectedHistoryDate = todayKey;
+  const lastRunOrderByTask = {};
+
+  dateLabel.textContent = `日期：${today.toLocaleDateString('zh-CN')}`;
+  if (historyDateInput) historyDateInput.value = todayKey;
+
+  if (!pool.length) {
+    taskList.innerHTML = '<p>词库加载失败，请检查 wordlist.js。</p>';
+    return;
+  }
+  if (!listIds.length) {
+    taskList.innerHTML = '<p>词表分组加载失败，请检查 wordlist.js 是否包含 list_no。</p>';
+    return;
   }
 
   function renderTodayWordsPanel() {
-    const words = getWordsByDate(todayKey);
+    const listId = getTodayListId();
+    const words = listId ? getWordsByList(listId) : [];
     todayWordsList.innerHTML = '';
-    if (!words.length) {
-      todayWordsList.innerHTML = '<p class="note">今天的单词还未生成，请先刷新页面重试。</p>';
-      return;
-    }
     words.forEach((item, idx) => {
       const div = document.createElement('div');
       div.className = 'today-word-item';
@@ -431,78 +276,278 @@
     if (visible) {
       renderTodayWordsPanel();
       todayWordsPanel.classList.remove('hidden');
-      showTodayWordsBtn.textContent = '收起今日单词';
     } else {
       todayWordsPanel.classList.add('hidden');
-      showTodayWordsBtn.textContent = '今日单词';
     }
   }
 
-  function renderHistoryBoard(dateKey) {
-    const tasks = buildTasksForDate(dateKey);
-    const doneTasks = tasks.filter((t) => getTaskDone(t.id));
-    const pendingTasks = tasks.filter((t) => !getTaskDone(t.id));
-    historySummary.textContent = `${dateKey} | 待办 ${pendingTasks.length} | 已完成 ${doneTasks.length}`;
-    renderTaskItems(historyPendingList, pendingTasks, '这一天没有待办任务。', 'history', dateKey);
-    renderTaskItems(historyDoneList, doneTasks, '这一天还没有已完成任务。', 'history', dateKey);
+  function renderTodayBoard() {
+    const tasks = todayTasks();
+    const [spellTask, choiceTask] = tasks;
+    const spellDone = getTaskDone(spellTask.id);
+    const choiceDone = getTaskDone(choiceTask.id);
+    const listId = getTodayListId();
+    const listLabel = getListLabel(listId || 0);
+    boardSummary.textContent = `${listLabel} | 完成 ${(spellDone ? 1 : 0) + (choiceDone ? 1 : 0)} / 2`;
+
+    taskList.innerHTML = '';
+    const wrapper = document.createElement('div');
+    wrapper.className = 'task-item';
+
+    const top = document.createElement('div');
+    top.className = 'task-top';
+    const name = document.createElement('div');
+    name.className = 'task-name';
+    name.textContent = `${listLabel} 今日任务`;
+    const tag = document.createElement('span');
+    tag.className = `tag${spellDone && choiceDone ? ' done' : ''}`;
+    tag.textContent = spellDone && choiceDone ? '已完成' : '可练习';
+    top.appendChild(name);
+    top.appendChild(tag);
+
+    const meta = document.createElement('div');
+    meta.className = 'task-meta';
+    meta.textContent = `${spellTask.words.length}词`;
+
+    const btnRow = document.createElement('div');
+    btnRow.className = 'btn-row';
+
+    const spellBtn = document.createElement('button');
+    spellBtn.textContent = spellDone ? '重做拼写' : '拼写测试';
+    spellBtn.addEventListener('click', () => startTask(spellTask, 'today'));
+
+    const choiceBtn = document.createElement('button');
+    choiceBtn.textContent = choiceDone ? '重做词义' : '词义测试';
+    choiceBtn.addEventListener('click', () => startTask(choiceTask, 'today'));
+
+    const wordsBtn = document.createElement('button');
+    wordsBtn.type = 'button';
+    wordsBtn.textContent = todayWordsVisible ? '收起今日单词' : '今日单词';
+    wordsBtn.addEventListener('click', () => setTodayWordsVisible(!todayWordsVisible));
+
+    btnRow.appendChild(spellBtn);
+    btnRow.appendChild(choiceBtn);
+    btnRow.appendChild(wordsBtn);
+
+    wrapper.appendChild(top);
+    wrapper.appendChild(meta);
+    wrapper.appendChild(btnRow);
+    taskList.appendChild(wrapper);
+  }
+
+  function renderReviewBoard() {
+    const groups = reviewTaskGroups();
+    historySummary.textContent = `可选词表任务：${groups.length} 个`;
+    historyPendingList.innerHTML = '';
+
+    groups.forEach((g) => {
+      const spellDone = getTaskDone(g.spellTask.id);
+      const choiceDone = getTaskDone(g.choiceTask.id);
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'task-item';
+
+      const top = document.createElement('div');
+      top.className = 'task-top';
+      const name = document.createElement('div');
+      name.className = 'task-name';
+      name.textContent = `${g.label} 复习任务`;
+      const tag = document.createElement('span');
+      tag.className = `tag${spellDone && choiceDone ? ' done' : ''}`;
+      tag.textContent = spellDone && choiceDone ? '已完成' : '可练习';
+      top.appendChild(name);
+      top.appendChild(tag);
+
+      const meta = document.createElement('div');
+      meta.className = 'task-meta';
+      meta.textContent = `${g.words.length}词`;
+
+      const btnRow = document.createElement('div');
+      btnRow.className = 'btn-row';
+
+      const spellBtn = document.createElement('button');
+      spellBtn.textContent = spellDone ? '重做拼写' : '拼写测试';
+      spellBtn.addEventListener('click', () => startTask(g.spellTask, 'history'));
+
+      const choiceBtn = document.createElement('button');
+      choiceBtn.textContent = choiceDone ? '重做词义' : '词义测试';
+      choiceBtn.addEventListener('click', () => startTask(g.choiceTask, 'history'));
+
+      const wordsBtn = document.createElement('button');
+      wordsBtn.type = 'button';
+      wordsBtn.textContent = '复习单词';
+
+      const wordsPanel = document.createElement('div');
+      wordsPanel.className = 'task-words-panel hidden';
+      const wordsList = document.createElement('div');
+      wordsList.className = 'today-words-list';
+      wordsPanel.appendChild(wordsList);
+
+      wordsBtn.addEventListener('click', () => {
+        const open = wordsPanel.classList.contains('hidden');
+        if (!open) {
+          wordsPanel.classList.add('hidden');
+          wordsBtn.textContent = '复习单词';
+          return;
+        }
+        wordsList.innerHTML = '';
+        g.words.forEach((item, idx) => {
+          const div = document.createElement('div');
+          div.className = 'today-word-item';
+          div.innerHTML = `
+            <div><span class="w">${idx + 1}. ${escapeHTML(item.word)}</span></div>
+            <div class="meta">${escapeHTML(item.phonetic || '-')}  ${escapeHTML(item.pos || '-')}</div>
+            <div>${escapeHTML(item.meaning)}</div>
+          `;
+          wordsList.appendChild(div);
+        });
+        wordsPanel.classList.remove('hidden');
+        wordsBtn.textContent = '收起复习单词';
+      });
+
+      btnRow.appendChild(spellBtn);
+      btnRow.appendChild(choiceBtn);
+      btnRow.appendChild(wordsBtn);
+
+      wrapper.appendChild(top);
+      wrapper.appendChild(meta);
+      wrapper.appendChild(btnRow);
+      wrapper.appendChild(wordsPanel);
+      historyPendingList.appendChild(wrapper);
+    });
+  }
+
+  function collectNewTaskRows() {
+    const rows = {};
+    Object.entries(state.taskProgress).forEach(([taskId, info]) => {
+      if (!info?.done) return;
+      const m = taskId.match(/^(\\d{4}-\\d{2}-\\d{2})\\|new\\|(spell|choice)\\|(\\d+)$/);
+      if (!m) return;
+      const [, dateKey, kind, listIdRaw] = m;
+      const listId = Number(listIdRaw);
+      if (!rows[dateKey]) {
+        rows[dateKey] = { dateKey, listId, spell: false, choice: false };
+      }
+      rows[dateKey].listId = listId;
+      if (kind === 'spell') rows[dateKey].spell = true;
+      if (kind === 'choice') rows[dateKey].choice = true;
+    });
+    return rows;
+  }
+
+  function renderStatsBoard(dateKey) {
+    const rows = collectNewTaskRows();
+    const dayRows = Object.values(rows).filter((r) => r.dateKey === dateKey);
+    const suggestRows = Object.values(rows).filter((r) => {
+      if (!(r.spell && r.choice)) return false;
+      const gap = diffDays(r.dateKey, dateKey);
+      return REVIEW_INTERVALS.includes(gap);
+    }).sort((a, b) => (a.dateKey > b.dateKey ? -1 : 1));
+
+    if (historyDateInput) historyDateInput.value = dateKey;
+    statsSummary.textContent = `${dateKey} | 完成词表 ${dayRows.length} | 建议复习 ${suggestRows.length}`;
+
+    statsList.innerHTML = '';
+    reviewSuggestList.innerHTML = '';
+
+    if (!dayRows.length) {
+      statsList.innerHTML = '<p class=\"note\">当天没有完成新词测试记录。</p>';
+    } else {
+      dayRows.forEach((row) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'task-item';
+
+        const top = document.createElement('div');
+        top.className = 'task-top';
+        const name = document.createElement('div');
+        name.className = 'task-name';
+        name.textContent = `${getListLabel(row.listId)}`;
+        const doneAll = row.spell && row.choice;
+        const tag = document.createElement('span');
+        tag.className = `tag${doneAll ? ' done' : ''}`;
+        tag.textContent = doneAll ? '已完成' : '部分完成';
+        top.appendChild(name);
+        top.appendChild(tag);
+
+        const meta = document.createElement('div');
+        meta.className = 'task-meta';
+        meta.textContent = `拼写测试: ${row.spell ? '已完成' : '未完成'} | 词义测试: ${row.choice ? '已完成' : '未完成'}`;
+
+        wrapper.appendChild(top);
+        wrapper.appendChild(meta);
+        statsList.appendChild(wrapper);
+      });
+    }
+
+    if (!suggestRows.length) {
+      reviewSuggestList.innerHTML = '<p class=\"note\">当天无遗忘曲线建议复习词表。</p>';
+    } else {
+      suggestRows.forEach((row) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'task-item';
+        const gap = diffDays(row.dateKey, dateKey);
+
+        const top = document.createElement('div');
+        top.className = 'task-top';
+        const name = document.createElement('div');
+        name.className = 'task-name';
+        name.textContent = `${getListLabel(row.listId)}`;
+        const tag = document.createElement('span');
+        tag.className = 'tag';
+        tag.textContent = `间隔 ${gap} 天`;
+        top.appendChild(name);
+        top.appendChild(tag);
+
+        const meta = document.createElement('div');
+        meta.className = 'task-meta';
+        meta.textContent = `学习日期: ${row.dateKey}`;
+        wrapper.appendChild(top);
+        wrapper.appendChild(meta);
+        reviewSuggestList.appendChild(wrapper);
+      });
+    }
   }
 
   function setView(view) {
     activeView = view;
-    const isToday = view === 'today';
-
     stopTimer();
     session = null;
     quizCard.classList.add('hidden');
     resultCard.classList.add('hidden');
 
-    if (isToday) {
+    if (view === 'today') {
       taskBoard.classList.remove('hidden');
       historyBoard.classList.add('hidden');
-      todayTabBtn.classList.remove('secondary');
-      historyTabBtn.classList.add('secondary');
+      statsBoard.classList.add('hidden');
       renderTodayBoard();
       setTodayWordsVisible(todayWordsVisible);
-    } else {
+    } else if (view === 'history') {
       taskBoard.classList.add('hidden');
       historyBoard.classList.remove('hidden');
-      todayTabBtn.classList.add('secondary');
-      historyTabBtn.classList.remove('secondary');
-      historyDateInput.value = historyDateKey;
-      renderHistoryBoard(historyDateKey);
+      statsBoard.classList.add('hidden');
+      setTodayWordsVisible(false);
+      renderReviewBoard();
+    } else {
+      taskBoard.classList.add('hidden');
+      historyBoard.classList.add('hidden');
+      statsBoard.classList.remove('hidden');
+      setTodayWordsVisible(false);
+      renderStatsBoard(selectedHistoryDate);
     }
   }
 
   function createChoiceOptions(task, questionIndex) {
     const q = task.words[questionIndex];
     const distractors = task.words.filter((w) => w.word !== q.word);
-    const shuffled = shuffleBySeed(distractors, `${task.id}|opt|${questionIndex}`).slice(0, MCQ_COUNT - 1);
-    const options = shuffled.map((w) => ({ word: w.word, meaning: w.meaning, correct: false }));
-    options.push({ word: q.word, meaning: q.meaning, correct: true });
-    return shuffleBySeed(options, `${task.id}|ans|${questionIndex}`);
-  }
-
-  function randomShuffle(arr) {
-    const out = arr.slice();
-    for (let i = out.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [out[i], out[j]] = [out[j], out[i]];
-    }
-    return out;
-  }
-
-  function sameOrder(a, b) {
-    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i += 1) {
-      if (a[i] !== b[i]) return false;
-    }
-    return true;
+    const shuffled = randomShuffle(distractors).slice(0, MCQ_COUNT - 1);
+    const options = shuffled.map((w) => ({ meaning: w.meaning, correct: false }));
+    options.push({ meaning: q.meaning, correct: true });
+    return randomShuffle(options);
   }
 
   function buildRunQueue(task) {
     const base = task.words.map((_, i) => i);
     if (base.length <= 1) return base;
-
     const prev = lastRunOrderByTask[task.id];
     let next = randomShuffle(base);
     let tries = 0;
@@ -525,16 +570,14 @@
     stopTimer();
     timerInterval = setInterval(() => {
       if (!session) return;
-      const used = Date.now() - session.startedAt;
-      timerText.textContent = `用时: ${formatDuration(used)}`;
+      timerText.textContent = `用时: ${formatDuration(Date.now() - session.startedAt)}`;
     }, 1000);
   }
 
-  function startTask(task, sourceView, sourceDateKey) {
+  function startTask(task, sourceView) {
     session = {
       task,
       returnView: sourceView,
-      returnDateKey: sourceDateKey,
       queue: buildRunQueue(task),
       currentIndex: null,
       completed: new Set(),
@@ -554,37 +597,32 @@
     quizCard.classList.remove('hidden');
 
     taskTitle.textContent = task.label;
-    taskMeta.textContent = `${task.desc} | 词源日期: ${task.sourceDate}`;
+    taskMeta.textContent = task.desc;
     timerText.textContent = '用时: 00:00';
-
     startTimer();
     renderQuestion();
   }
 
   function renderSpellQuestion(q) {
     const meta = lexMeta(q);
-    if (meta) {
-      promptText.innerHTML = `<span>${escapeHTML(q.meaning)}</span><div class=\"prompt-meta\">${escapeHTML(meta)}</div>`;
-    } else {
-      promptText.textContent = q.meaning;
-    }
+    promptText.innerHTML = meta
+      ? `<span>${escapeHTML(q.meaning)}</span><div class="prompt-meta">${escapeHTML(meta)}</div>`
+      : escapeHTML(q.meaning);
+
     spellingHints.classList.remove('hidden');
     spellingWrap.classList.remove('hidden');
     mcqWrap.classList.add('hidden');
-
     wordMask.textContent = buildWordMask(q.word);
-
     answerInput.value = '';
     answerInput.focus();
   }
 
   function renderChoiceQuestion(q) {
     const meta = lexMeta(q);
-    if (meta) {
-      promptText.innerHTML = `<span>${escapeHTML(q.word)}</span><span class=\"prompt-meta-inline\"> ${escapeHTML(meta)}</span>`;
-    } else {
-      promptText.textContent = q.word;
-    }
+    promptText.innerHTML = meta
+      ? `<span>${escapeHTML(q.word)}</span><span class="prompt-meta-inline"> ${escapeHTML(meta)}</span>`
+      : escapeHTML(q.word);
+
     spellingHints.classList.add('hidden');
     spellingWrap.classList.add('hidden');
     mcqWrap.classList.remove('hidden');
@@ -601,28 +639,25 @@
       btn.addEventListener('click', () => {
         if (session.checked) return;
         session.selectedChoice = idx;
-        [...mcqOptions.children].forEach((child, i) => {
-          child.classList.toggle('selected', i === idx);
-        });
+        [...mcqOptions.children].forEach((el, i) => el.classList.toggle('selected', i === idx));
       });
       mcqOptions.appendChild(btn);
     });
   }
 
   function renderQuestion() {
-    const { task, score } = session;
     if (!session.queue.length) {
       showResult();
       return;
     }
 
     session.currentIndex = session.queue[0];
-    const q = task.words[session.currentIndex];
+    const q = session.task.words[session.currentIndex];
     const doneCount = session.completed.size;
 
-    progressText.textContent = `已掌握: ${doneCount} / ${task.words.length} | 当前第 ${session.attemptCount + 1} 次作答`;
-    scoreText.textContent = `答对次数: ${score}`;
-    progressFill.style.width = `${(doneCount / task.words.length) * 100}%`;
+    progressText.textContent = `已掌握: ${doneCount} / ${session.task.words.length} | 当前第 ${session.attemptCount + 1} 次作答`;
+    scoreText.textContent = `答对次数: ${session.score}`;
+    progressFill.style.width = `${(doneCount / session.task.words.length) * 100}%`;
 
     feedback.textContent = '';
     feedback.className = 'feedback';
@@ -631,17 +666,14 @@
     submitBtn.disabled = false;
     nextBtn.disabled = false;
 
-    if (task.type === 'spell') {
-      renderSpellQuestion(q);
-    } else {
-      renderChoiceQuestion(q);
-    }
+    if (session.task.type === 'spell') renderSpellQuestion(q);
+    else renderChoiceQuestion(q);
   }
 
   function lockChoiceOptions(correctIndex, selectedIndex) {
     [...mcqOptions.children].forEach((el, idx) => {
       if (idx === correctIndex) el.classList.add('lock-correct');
-      if (selectedIndex === idx && idx !== correctIndex) el.classList.add('lock-wrong');
+      if (idx === selectedIndex && idx !== correctIndex) el.classList.add('lock-wrong');
       el.disabled = true;
     });
   }
@@ -649,14 +681,13 @@
   function checkAnswer() {
     if (!session || session.checked) return;
 
-    const { task } = session;
-    const q = task.words[session.currentIndex];
+    const q = session.task.words[session.currentIndex];
     session.attemptCount += 1;
 
     let isCorrect = false;
     let userAnswer = '';
 
-    if (task.type === 'spell') {
+    if (session.task.type === 'spell') {
       userAnswer = answerInput.value.trim();
       if (!userAnswer) {
         feedback.textContent = '请先输入拼写。';
@@ -673,8 +704,7 @@
       const selected = session.choiceOptions[session.selectedChoice];
       userAnswer = selected.meaning;
       isCorrect = Boolean(selected.correct);
-      const correctIndex = session.choiceOptions.findIndex((o) => o.correct);
-      lockChoiceOptions(correctIndex, session.selectedChoice);
+      lockChoiceOptions(session.choiceOptions.findIndex((o) => o.correct), session.selectedChoice);
     }
 
     session.checked = true;
@@ -690,37 +720,34 @@
     } else {
       const wrongIndex = session.queue.shift();
       session.queue.push(wrongIndex);
-      feedback.textContent = task.type === 'spell' ? `错误，正确答案：${q.word}` : `错误，正确答案：${q.meaning}`;
+      feedback.textContent = session.task.type === 'spell' ? `错误，正确答案：${q.word}` : `错误，正确答案：${q.meaning}`;
       feedback.className = 'feedback err';
       session.wrong.push({ ...q, userAnswer });
     }
 
     scoreText.textContent = `答对次数: ${session.score}`;
-    progressFill.style.width = `${(session.completed.size / task.words.length) * 100}%`;
+    progressFill.style.width = `${(session.completed.size / session.task.words.length) * 100}%`;
   }
 
   function showResult() {
-    const { task, score, wrong } = session;
     stopTimer();
     session.elapsedMs = Date.now() - session.startedAt;
-
-    markTaskDone(task.id, score, task.words.length, wrong);
+    markTaskDone(session.task.id, session.score, session.task.words.length, session.wrong);
 
     quizCard.classList.add('hidden');
     resultCard.classList.remove('hidden');
 
-    resultTitle.textContent = task.label;
-    finalScore.textContent = `总用时：${formatDuration(session.elapsedMs)} | 答对次数：${score} | 总作答：${session.attemptCount}`;
+    resultTitle.textContent = session.task.label;
+    finalScore.textContent = `总用时：${formatDuration(session.elapsedMs)} | 答对次数：${session.score} | 总作答：${session.attemptCount}`;
 
     wrongList.innerHTML = '';
-    if (!wrong.length) {
+    if (!session.wrong.length) {
       wrongList.innerHTML = '<p>本任务全对。</p>';
     } else {
       const title = document.createElement('p');
-      title.textContent = `错题记录 ${wrong.length} 条：`;
+      title.textContent = `错题记录 ${session.wrong.length} 条：`;
       wrongList.appendChild(title);
-
-      wrong.forEach((item) => {
+      session.wrong.forEach((item) => {
         const div = document.createElement('div');
         div.className = 'wrong-item';
         div.textContent = `${item.word} | 你的答案: ${item.userAnswer || '(空)'} | 释义: ${item.meaning}`;
@@ -728,53 +755,45 @@
       });
     }
 
-    window.alert(`恭喜完成任务：${task.label}\n总完成时间：${formatDuration(session.elapsedMs)}`);
+    window.alert(`恭喜完成任务：${session.task.label}\n总完成时间：${formatDuration(session.elapsedMs)}`);
   }
 
   function goNext() {
     if (!session) return;
-
     if (!session.checked) {
       if (session.queue.length > 1) {
         const skipped = session.queue.shift();
         session.queue.push(skipped);
-        feedback.textContent = '本题已跳过，稍后会再次出现。';
-        feedback.className = 'feedback';
       }
       renderQuestion();
       return;
     }
-
-    if (!session.queue.length) {
-      showResult();
-      return;
-    }
-    renderQuestion();
+    if (!session.queue.length) showResult();
+    else renderQuestion();
   }
 
   function backToBoard() {
-    const returnView = session?.returnView || activeView;
-    const returnDateKey = session?.returnDateKey || historyDateKey;
-
+    const retView = session?.returnView || activeView;
     stopTimer();
     session = null;
-
     quizCard.classList.add('hidden');
     resultCard.classList.add('hidden');
-
-    if (returnView === 'history') {
-      historyDateKey = returnDateKey;
-      setView('history');
-    } else {
-      setView('today');
-    }
+    setView(retView);
   }
 
   function resetCurrentTask() {
     if (!session) return;
-    const ok = window.confirm('确认重新开始当前任务吗？当前进度将重置。');
-    if (!ok) return;
-    startTask(session.task, session.returnView, session.returnDateKey);
+    if (!window.confirm('确认重新开始当前任务吗？当前进度将重置。')) return;
+    startTask(session.task, session.returnView);
+  }
+
+  function bindViewSwitch(btn, view) {
+    const handler = (e) => {
+      e.preventDefault();
+      setView(view);
+    };
+    btn.addEventListener('click', handler);
+    btn.addEventListener('touchend', handler, { passive: false });
   }
 
   submitBtn.addEventListener('click', checkAnswer);
@@ -789,30 +808,21 @@
     else checkAnswer();
   });
 
-  function bindViewSwitch(btn, view) {
-    const handler = (e) => {
-      e.preventDefault();
-      setView(view);
-    };
-    btn.addEventListener('click', handler);
-    btn.addEventListener('touchend', handler, { passive: false });
+  if (showTodayWordsBtn && hideTodayWordsBtn) {
+    showTodayWordsBtn.addEventListener('click', () => setTodayWordsVisible(!todayWordsVisible));
+    hideTodayWordsBtn.addEventListener('click', () => setTodayWordsVisible(false));
+  } else if (hideTodayWordsBtn) {
+    hideTodayWordsBtn.addEventListener('click', () => setTodayWordsVisible(false));
   }
 
   bindViewSwitch(todayTabBtn, 'today');
   bindViewSwitch(historyTabBtn, 'history');
-  openHistoryBtn.addEventListener('click', () => setView('history'));
-  if (showTodayWordsBtn && todayWordsPanel && todayWordsList && hideTodayWordsBtn) {
-    showTodayWordsBtn.addEventListener('click', () => {
-      setTodayWordsVisible(!todayWordsVisible);
-    });
-    hideTodayWordsBtn.addEventListener('click', () => {
-      setTodayWordsVisible(false);
+  bindViewSwitch(statsTabBtn, 'stats');
+  if (historyDateInput) {
+    historyDateInput.addEventListener('change', () => {
+      selectedHistoryDate = historyDateInput.value || todayKey;
+      renderStatsBoard(selectedHistoryDate);
     });
   }
-  historyDateInput.addEventListener('change', () => {
-    historyDateKey = historyDateInput.value || todayKey;
-    renderHistoryBoard(historyDateKey);
-  });
-
   setView('today');
 })();

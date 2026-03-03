@@ -17,7 +17,8 @@
       <p id="dateLabel"></p>
       <div class="view-tabs">
         <button id="todayTabBtn" type="button">今日任务</button>
-        <button id="historyTabBtn" type="button" class="secondary">历史任务</button>
+        <button id="historyTabBtn" type="button">复习任务</button>
+        <button id="statsTabBtn" type="button">历史</button>
       </div>
     </header>
 
@@ -26,36 +27,41 @@
         <h2>今日任务</h2>
         <p id="boardSummary"></p>
       </div>
-      <div class="btn-row">
-        <button id="showTodayWordsBtn" type="button" class="secondary">今日单词</button>
-        <button id="openHistoryBtn" type="button" class="secondary">进入历史任务</button>
-      </div>
       <div id="todayWordsPanel" class="today-words-panel hidden">
         <div class="task-top">
-          <div class="task-name">今日30词完整信息</div>
-          <button id="hideTodayWordsBtn" type="button" class="secondary">关闭</button>
+          <div class="task-name">今日词表完整信息</div>
+          <button id="hideTodayWordsBtn" type="button">关闭</button>
         </div>
         <div id="todayWordsList" class="today-words-list"></div>
       </div>
       <div id="taskList" class="task-list"></div>
-      <p class="note">任务包含：给中文拼英文 + 给英文选中文（6选1，选项来自该30词）。</p>
+      <p class="note">任务包含：给中文拼英文 + 给英文选中文（6选1，选项来自当前词表）。</p>
     </section>
 
     <section class="glass board-card" id="historyBoard">
       <div class="board-head">
-        <h2>历史任务</h2>
+        <h2>复习任务</h2>
         <p id="historySummary"></p>
+      </div>
+      <p class="note">从 Word List 01-48 中任选一个词表开始复习测试。</p>
+      <div id="historyPendingList" class="task-list"></div>
+    </section>
+
+    <section class="glass board-card hidden" id="statsBoard">
+      <div class="board-head">
+        <h2>历史</h2>
+        <p id="statsSummary"></p>
       </div>
       <label class="input-label" for="historyDateInput">选择日期</label>
       <input id="historyDateInput" type="date" />
       <div class="history-columns">
         <div>
-          <h3>待办任务</h3>
-          <div id="historyPendingList" class="task-list"></div>
+          <h3>当日已完成词表</h3>
+          <div id="statsList" class="task-list"></div>
         </div>
         <div>
-          <h3>已完成任务</h3>
-          <div id="historyDoneList" class="task-list"></div>
+          <h3>遗忘曲线建议复习</h3>
+          <div id="reviewSuggestList" class="task-list"></div>
         </div>
       </div>
     </section>
@@ -98,8 +104,8 @@
 
       <div class="actions">
         <button id="submitBtn">提交</button>
-        <button id="nextBtn" class="secondary" disabled>下一题</button>
-        <button id="quitBtn" class="secondary">返回任务列表</button>
+        <button id="nextBtn" disabled>下一题</button>
+        <button id="quitBtn">返回任务列表</button>
       </div>
     </section>
 
