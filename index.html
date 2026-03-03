@@ -27,7 +27,15 @@
         <p id="boardSummary"></p>
       </div>
       <div class="btn-row">
+        <button id="showTodayWordsBtn" type="button" class="secondary">今日单词</button>
         <button id="openHistoryBtn" type="button" class="secondary">进入历史任务</button>
+      </div>
+      <div id="todayWordsPanel" class="today-words-panel hidden">
+        <div class="task-top">
+          <div class="task-name">今日30词完整信息</div>
+          <button id="hideTodayWordsBtn" type="button" class="secondary">关闭</button>
+        </div>
+        <div id="todayWordsList" class="today-words-list"></div>
       </div>
       <div id="taskList" class="task-list"></div>
       <p class="note">任务包含：给中文拼英文 + 给英文选中文（6选1，选项来自该30词）。</p>

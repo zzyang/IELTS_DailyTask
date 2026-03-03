@@ -148,6 +148,38 @@ body {
   gap: 10px;
 }
 
+.today-words-panel {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.42);
+  display: grid;
+  gap: 10px;
+}
+
+.today-words-list {
+  max-height: 320px;
+  overflow: auto;
+  display: grid;
+  gap: 8px;
+}
+
+.today-word-item {
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.36);
+  line-height: 1.45;
+}
+
+.today-word-item .w {
+  font-weight: 700;
+}
+
+.today-word-item .meta {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
 .quiz-head h2 {
   margin: 0;
 }

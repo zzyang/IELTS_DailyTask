@@ -13,6 +13,10 @@
   const taskBoard = document.getElementById('taskBoard');
   const boardSummary = document.getElementById('boardSummary');
   const taskList = document.getElementById('taskList');
+  const showTodayWordsBtn = document.getElementById('showTodayWordsBtn');
+  const hideTodayWordsBtn = document.getElementById('hideTodayWordsBtn');
+  const todayWordsPanel = document.getElementById('todayWordsPanel');
+  const todayWordsList = document.getElementById('todayWordsList');
   const openHistoryBtn = document.getElementById('openHistoryBtn');
 
   const historyBoard = document.getElementById('historyBoard');
@@ -283,6 +287,7 @@
   let historyDateKey = todayKey;
   let session = null;
   let timerInterval = null;
+  let todayWordsVisible = false;
   const lastRunOrderByTask = {};
 
   dateLabel.textContent = `日期：${today.toLocaleDateString('zh-CN')}`;
@@ -364,6 +369,37 @@
     renderTaskItems(taskList, tasks, '今天暂无任务。', 'today', todayKey);
   }
 
+  function renderTodayWordsPanel() {
+    const words = getWordsByDate(todayKey);
+    todayWordsList.innerHTML = '';
+    if (!words.length) {
+      todayWordsList.innerHTML = '<p class="note">今天的单词还未生成，请先刷新页面重试。</p>';
+      return;
+    }
+    words.forEach((item, idx) => {
+      const div = document.createElement('div');
+      div.className = 'today-word-item';
+      div.innerHTML = `
+        <div><span class="w">${idx + 1}. ${escapeHTML(item.word)}</span></div>
+        <div class="meta">${escapeHTML(item.phonetic || '-')}  ${escapeHTML(item.pos || '-')}</div>
+        <div>${escapeHTML(item.meaning)}</div>
+      `;
+      todayWordsList.appendChild(div);
+    });
+  }
+
+  function setTodayWordsVisible(visible) {
+    todayWordsVisible = visible;
+    if (visible) {
+      renderTodayWordsPanel();
+      todayWordsPanel.classList.remove('hidden');
+      showTodayWordsBtn.textContent = '收起今日单词';
+    } else {
+      todayWordsPanel.classList.add('hidden');
+      showTodayWordsBtn.textContent = '今日单词';
+    }
+  }
+
   function renderHistoryBoard(dateKey) {
     const tasks = buildTasksForDate(dateKey);
     const doneTasks = tasks.filter((t) => getTaskDone(t.id));
@@ -388,6 +424,7 @@
       todayTabBtn.classList.remove('secondary');
       historyTabBtn.classList.add('secondary');
       renderTodayBoard();
+      setTodayWordsVisible(todayWordsVisible);
     } else {
       taskBoard.classList.add('hidden');
       historyBoard.classList.remove('hidden');
@@ -726,6 +763,14 @@
   bindViewSwitch(todayTabBtn, 'today');
   bindViewSwitch(historyTabBtn, 'history');
   openHistoryBtn.addEventListener('click', () => setView('history'));
+  if (showTodayWordsBtn && todayWordsPanel && todayWordsList && hideTodayWordsBtn) {
+    showTodayWordsBtn.addEventListener('click', () => {
+      setTodayWordsVisible(!todayWordsVisible);
+    });
+    hideTodayWordsBtn.addEventListener('click', () => {
+      setTodayWordsVisible(false);
+    });
+  }
   historyDateInput.addEventListener('change', () => {
     historyDateKey = historyDateInput.value || todayKey;
     renderHistoryBoard(historyDateKey);
