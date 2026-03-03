@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IELTS 每日任务训练</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+  <div class="bg-orb orb-3"></div>
+
+  <main class="app-shell">
+    <header class="glass header">
+      <h1>IELTS 每日任务训练</h1>
+      <p id="dateLabel"></p>
+      <div class="view-tabs">
+        <button id="todayTabBtn" type="button">今日任务</button>
+        <button id="historyTabBtn" type="button" class="secondary">历史任务</button>
+      </div>
+    </header>
+
+    <section class="glass board-card" id="taskBoard">
+      <div class="board-head">
+        <h2>今日任务</h2>
+        <p id="boardSummary"></p>
+      </div>
+      <div class="btn-row">
+        <button id="openHistoryBtn" type="button" class="secondary">进入历史任务</button>
+      </div>
+      <div id="taskList" class="task-list"></div>
+      <p class="note">任务包含：给中文拼英文 + 给英文选中文（6选1，选项来自该30词）。</p>
+    </section>
+
+    <section class="glass board-card" id="historyBoard">
+      <div class="board-head">
+        <h2>历史任务</h2>
+        <p id="historySummary"></p>
+      </div>
+      <label class="input-label" for="historyDateInput">选择日期</label>
+      <input id="historyDateInput" type="date" />
+      <div class="history-columns">
+        <div>
+          <h3>待办任务</h3>
+          <div id="historyPendingList" class="task-list"></div>
+        </div>
+        <div>
+          <h3>已完成任务</h3>
+          <div id="historyDoneList" class="task-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="glass quiz-card hidden" id="quizCard">
+      <div class="quiz-head">
+        <h2 id="taskTitle"></h2>
+        <p id="taskMeta"></p>
+      </div>
+
+      <div class="top-row">
+        <span id="progressText">1 / 30</span>
+        <span id="scoreText">正确: 0</span>
+        <span id="timerText">用时: 00:00</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+
+      <div class="prompt" id="promptText"></div>
+
+      <div class="hints" id="spellingHints">
+        <div class="hint-item">首字母: <b id="firstLetter">-</b></div>
+        <div class="hint-item">尾字母: <b id="lastLetter">-</b></div>
+        <div class="hint-item">字母长度: <b id="wordLength">-</b></div>
+      </div>
+
+      <div id="spellingWrap">
+        <label class="input-label" for="answerInput">请输入完整单词</label>
+        <input id="answerInput" type="text" autocomplete="off" spellcheck="false" />
+      </div>
+
+      <div id="mcqWrap" class="mcq-wrap hidden">
+        <p class="input-label">请选择正确中文：</p>
+        <div id="mcqOptions" class="mcq-options"></div>
+      </div>
+
+      <p id="feedback" class="feedback"></p>
+
+      <div class="actions">
+        <button id="submitBtn">提交</button>
+        <button id="nextBtn" class="secondary" disabled>下一题</button>
+        <button id="quitBtn" class="secondary">返回任务列表</button>
+      </div>
+    </section>
+
+    <section class="glass result-card hidden" id="resultCard">
+      <h2 id="resultTitle">任务完成</h2>
+      <p id="finalScore"></p>
+      <div id="wrongList"></div>
+      <button id="backBoardBtn">返回任务列表</button>
+    </section>
+  </main>
+
+  <script src="wordlist.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
