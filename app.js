@@ -46,6 +46,7 @@
   const submitBtn = document.getElementById('submitBtn');
   const nextBtn = document.getElementById('nextBtn');
   const quitBtn = document.getElementById('quitBtn');
+  const resetTaskBtn = document.getElementById('resetTaskBtn');
 
   const resultTitle = document.getElementById('resultTitle');
   const finalScore = document.getElementById('finalScore');
@@ -123,6 +124,22 @@
       return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     }
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+
+  function escapeHTML(text) {
+    return String(text || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function lexMeta(q) {
+    const parts = [];
+    if (q.phonetic) parts.push(q.phonetic);
+    if (q.pos) parts.push(q.pos);
+    return parts.join('  ');
   }
 
   function loadState() {
@@ -265,6 +282,7 @@
   let historyDateKey = todayKey;
   let session = null;
   let timerInterval = null;
+  const lastRunOrderByTask = {};
 
   dateLabel.textContent = `日期：${today.toLocaleDateString('zh-CN')}`;
   historyDateInput.value = todayKey;
@@ -388,6 +406,38 @@
     return shuffleBySeed(options, `${task.id}|ans|${questionIndex}`);
   }
 
+  function randomShuffle(arr) {
+    const out = arr.slice();
+    for (let i = out.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  }
+
+  function sameOrder(a, b) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i += 1) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  }
+
+  function buildRunQueue(task) {
+    const base = task.words.map((_, i) => i);
+    if (base.length <= 1) return base;
+
+    const prev = lastRunOrderByTask[task.id];
+    let next = randomShuffle(base);
+    let tries = 0;
+    while (sameOrder(next, prev) && tries < 5) {
+      next = randomShuffle(base);
+      tries += 1;
+    }
+    lastRunOrderByTask[task.id] = next.slice();
+    return next;
+  }
+
   function stopTimer() {
     if (timerInterval) {
       clearInterval(timerInterval);
@@ -409,7 +459,7 @@
       task,
       returnView: sourceView,
       returnDateKey: sourceDateKey,
-      queue: task.words.map((_, i) => i),
+      queue: buildRunQueue(task),
       currentIndex: null,
       completed: new Set(),
       attemptCount: 0,
@@ -436,7 +486,12 @@
   }
 
   function renderSpellQuestion(q) {
-    promptText.textContent = q.meaning;
+    const meta = lexMeta(q);
+    if (meta) {
+      promptText.innerHTML = `<span>${escapeHTML(q.meaning)}</span><div class=\"prompt-meta\">${escapeHTML(meta)}</div>`;
+    } else {
+      promptText.textContent = q.meaning;
+    }
     spellingHints.classList.remove('hidden');
     spellingWrap.classList.remove('hidden');
     mcqWrap.classList.add('hidden');
@@ -450,7 +505,12 @@
   }
 
   function renderChoiceQuestion(q) {
-    promptText.textContent = q.word;
+    const meta = lexMeta(q);
+    if (meta) {
+      promptText.innerHTML = `<span>${escapeHTML(q.word)}</span><span class=\"prompt-meta-inline\"> ${escapeHTML(meta)}</span>`;
+    } else {
+      promptText.textContent = q.word;
+    }
     spellingHints.classList.add('hidden');
     spellingWrap.classList.add('hidden');
     mcqWrap.classList.remove('hidden');
@@ -495,7 +555,7 @@
 
     session.checked = false;
     submitBtn.disabled = false;
-    nextBtn.disabled = true;
+    nextBtn.disabled = false;
 
     if (task.type === 'spell') {
       renderSpellQuestion(q);
@@ -598,7 +658,19 @@
   }
 
   function goNext() {
-    if (!session || !session.checked) return;
+    if (!session) return;
+
+    if (!session.checked) {
+      if (session.queue.length > 1) {
+        const skipped = session.queue.shift();
+        session.queue.push(skipped);
+        feedback.textContent = '本题已跳过，稍后会再次出现。';
+        feedback.className = 'feedback';
+      }
+      renderQuestion();
+      return;
+    }
+
     if (!session.queue.length) {
       showResult();
       return;
@@ -624,9 +696,17 @@
     }
   }
 
+  function resetCurrentTask() {
+    if (!session) return;
+    const ok = window.confirm('确认重新开始当前任务吗？当前进度将重置。');
+    if (!ok) return;
+    startTask(session.task, session.returnView, session.returnDateKey);
+  }
+
   submitBtn.addEventListener('click', checkAnswer);
   nextBtn.addEventListener('click', goNext);
   quitBtn.addEventListener('click', backToBoard);
+  resetTaskBtn.addEventListener('click', resetCurrentTask);
   backBoardBtn.addEventListener('click', backToBoard);
 
   answerInput.addEventListener('keydown', (e) => {
