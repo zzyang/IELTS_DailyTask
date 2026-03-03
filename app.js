@@ -327,6 +327,7 @@
       const done = getTaskDone(task.id);
       const wrapper = document.createElement('div');
       wrapper.className = 'task-item';
+      let reviewWordsPanel = null;
 
       const top = document.createElement('div');
       top.className = 'task-top';
@@ -355,9 +356,46 @@
       btn.addEventListener('click', () => startTask(task, sourceView, sourceDateKey));
       btnRow.appendChild(btn);
 
+      if (task.id.includes('|review|')) {
+        const reviewWordsBtn = document.createElement('button');
+        reviewWordsBtn.type = 'button';
+        reviewWordsBtn.className = 'secondary';
+        reviewWordsBtn.textContent = '复习单词';
+        btnRow.appendChild(reviewWordsBtn);
+
+        reviewWordsPanel = document.createElement('div');
+        reviewWordsPanel.className = 'task-words-panel hidden';
+        const reviewWordsList = document.createElement('div');
+        reviewWordsList.className = 'today-words-list';
+        reviewWordsPanel.appendChild(reviewWordsList);
+
+        reviewWordsBtn.addEventListener('click', () => {
+          const isHidden = reviewWordsPanel.classList.contains('hidden');
+          if (isHidden) {
+            reviewWordsList.innerHTML = '';
+            task.words.forEach((item, idx) => {
+              const div = document.createElement('div');
+              div.className = 'today-word-item';
+              div.innerHTML = `
+                <div><span class="w">${idx + 1}. ${escapeHTML(item.word)}</span></div>
+                <div class="meta">${escapeHTML(item.phonetic || '-')}  ${escapeHTML(item.pos || '-')}</div>
+                <div>${escapeHTML(item.meaning)}</div>
+              `;
+              reviewWordsList.appendChild(div);
+            });
+            reviewWordsPanel.classList.remove('hidden');
+            reviewWordsBtn.textContent = '收起复习单词';
+          } else {
+            reviewWordsPanel.classList.add('hidden');
+            reviewWordsBtn.textContent = '复习单词';
+          }
+        });
+      }
+
       wrapper.appendChild(top);
       wrapper.appendChild(meta);
       wrapper.appendChild(btnRow);
+      if (reviewWordsPanel) wrapper.appendChild(reviewWordsPanel);
       listEl.appendChild(wrapper);
     });
   }
