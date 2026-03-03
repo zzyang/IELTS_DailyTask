@@ -1,89 +1,158 @@
-# IELTS 每日任务训练（浏览器独立运行）
+# IELTS 每日任务训练 / IELTS Daily Task Trainer
 
-一个纯前端离线网页应用，用于雅思词汇每日训练与复习。
-下载源码后无需安装依赖，直接在浏览器即可运行（推荐用本地静态服务器打开）。
+## 中文说明
 
-## 1. 功能总览
+### 1. 项目简介
+这是一个纯前端（HTML/CSS/JavaScript）的雅思词汇训练网页应用，支持每日新词任务、历史任务查看、遗忘曲线复习、拼写与选择两种题型。
 
-- 每日新词任务（30词）
-- 题型A：给中文，输入英文拼写
-  - 提示首字母、尾字母、字母长度
-- 题型B：给英文，6选1中文释义
-  - 选项仅来自当天同一组30词
-- 错题回滚
-  - 答错会回到队尾，直到该任务 30 词全部答对才完成
-- 任务计时
-  - 每个任务独立计时，完成时弹窗显示总耗时
-- 历史任务页
-  - 可选择任意日期
-  - 显示该日期待办任务与已完成任务
-  - 可直接点击任意任务开始练习
-- 遗忘曲线复习任务
-  - 自动生成第 1/3/7/14/30 天复习（同样含两种题型）
+无需安装前端依赖。下载后可直接在浏览器运行（推荐使用本地静态服务器）。
 
-## 2. 目录结构
+### 2. 核心功能
+- 每日固定词包：每天自动分配 30 个单词。
+- 双题型训练：
+  - 中文 -> 英文拼写（显示首字母、尾字母、长度提示）。
+  - 英文 -> 中文选择（每题 6 选 1，选项来自当前这 30 个词）。
+- 音标与词性展示：
+  - 中文拼英文时：在中文释义下一行显示音标 + 词性。
+  - 英文选中文时：在英文后显示音标 + 词性。
+- 错题回滚：答错题会进入队尾，后续再次出现，直到答对为止。
+- 跳过机制：未作答可直接点“下一题”，该题会进入队尾稍后再出现。
+- 每次重开随机顺序：同一任务每次开始/重做时，单词顺序会重新随机。
+- 任务计时：任务开始即计时，全部答对后弹窗显示总完成时间。
+- 一键重开：任务页面右上角“重新开始”可重置当前任务进度。
+- 历史任务页：可选任意日期，查看“待办任务 / 已完成任务”，并可直接开始练习。
+- 遗忘曲线复习：自动生成第 1/3/7/14/30 天复习任务（两种题型都生成）。
 
-- `index.html`：页面结构
-- `styles.css`：界面样式（liquid glass 风格）
-- `app.js`：任务系统、出题、判分、计时、历史页、复习逻辑
-- `wordlist.js`：前端直接加载的词库数据
-- `IELTS Word List.txt`：原始词库文本
-- `generate_wordlist.py`：把 txt 词库转换为 `wordlist.js` 的脚本
-
-## 3. 运行方式
-
-### 方式A（推荐）本地静态服务
+### 3. 运行方式
+推荐使用 Python 本地静态服务器：
 
 ```bash
-cd /Users/andy/Documents/Playground/ielts_spelling_test
+cd /path/to/ielts_spelling_test
 python3 -m http.server 8000 --bind 127.0.0.1
 ```
 
-浏览器打开：
+打开浏览器：
 
-- `http://127.0.0.1:8000`
+- http://127.0.0.1:8000
 
-### 方式B 直接双击打开
+也可直接打开 `index.html`，但部分浏览器环境可能受本地文件策略影响，建议优先使用上面的方式。
 
-也可以直接打开 `index.html`。  
-如果浏览器安全策略导致异常（少数环境会出现），请改用方式A。
+### 4. 使用流程
+1. 进入“今日任务”开始当天训练。
+2. 在任务内完成两种题型（拼写 + 选择）。
+3. 可在任务中使用：
+   - “下一题”跳过未作答单词（后续回滚出现）。
+   - 右上角“重新开始”重置当前任务。
+4. 点击“历史任务”可切换到历史页面：
+   - 选择任意日期。
+   - 查看待办和已完成任务。
+   - 点击任务可直接开始或重做。
 
-## 4. 使用流程
+### 5. 数据与存储
+应用使用浏览器 `localStorage` 保存以下数据：
+- 每日 30 词分配进度
+- 历史词包索引
+- 各任务完成状态
 
-1. 打开页面后默认进入“今日任务”。
-2. 点击任务开始练习。
-3. 完成后可在结果页查看总耗时、总作答次数和错题记录。
-4. 点击顶部“历史任务”或“进入历史任务”按钮：
-   - 选择日期
-   - 查看该日期待办/已完成
-   - 点击任意任务继续练习或重做
+如果清除浏览器站点数据，以上记录会被重置。
 
-## 5. 词库更新
+### 6. 词库来源与更新
+- 原始词库文件：`IELTS Word List.txt`
+- 前端加载文件：`wordlist.js`
+- 生成脚本：`generate_wordlist.py`
 
-如果你替换了 `IELTS Word List.txt`，执行：
+当你替换词库文本后，执行：
 
 ```bash
-cd /Users/andy/Documents/Playground/ielts_spelling_test
+cd /path/to/ielts_spelling_test
 python3 generate_wordlist.py
 ```
 
-脚本会重新生成 `wordlist.js`，页面刷新后生效。
+然后刷新浏览器页面即可。
 
-## 6. 数据存储说明
+### 7. 项目结构
+- `index.html`：页面结构与主要容器。
+- `styles.css`：界面样式（Liquid Glass 风格）。
+- `app.js`：任务系统、题目逻辑、计时、历史页与复习算法。
+- `wordlist.js`：词库数据（由脚本生成）。
+- `generate_wordlist.py`：从 TXT 词库提取单词、释义、音标、词性并生成 JS 数据。
 
-- 应用会使用浏览器 `localStorage` 保存：
-  - 每日30词分配进度
-  - 任务完成状态
-- 清空浏览器站点数据后，这些记录会重置。
+---
 
-## 7. 发布到 GitHub（完整可下载运行）
+## English Version
 
-由于当前环境没有安装 `gh`（GitHub CLI）且仓库未配置远程地址，无法在这里直接代你推送到 GitHub。  
-你可以用下面流程 1 分钟发布：
+### 1. Overview
+This is a pure front-end IELTS vocabulary training app (HTML/CSS/JavaScript).
+It supports daily tasks, history view, spaced-review tasks, and two quiz modes.
 
-1. 在 GitHub 新建仓库（例如 `ielts-daily-trainer`）。
-2. 把本目录全部文件上传到仓库根目录。
-3. README 保持为当前版本。
-4. 用户下载 ZIP 后，按“运行方式A/B”即可本地独立运行。
+No front-end dependencies are required. After download, it can run directly in a browser (a local static server is recommended).
 
-如果你给我仓库 URL 和可用推送方式（HTTPS+token 或 SSH），我可以继续帮你把代码整理成可直接推送的命令序列。
+### 2. Key Features
+- Daily fixed set: 30 words are assigned each day.
+- Two quiz modes:
+  - Chinese -> English spelling (with first letter, last letter, and length hints).
+  - English -> Chinese multiple choice (6 options, options are selected from the same 30-word set).
+- Phonetic + part of speech display:
+  - In spelling mode: shown on the line below the Chinese meaning.
+  - In multiple-choice mode: shown after the English word.
+- Wrong-answer rollback: incorrect items move to the queue tail and reappear later.
+- Skip support: unanswered items can be skipped via “Next” and will reappear later.
+- Randomized order per run: each time a task starts/restarts, word order is reshuffled.
+- Task timer: starts when task starts; completion popup shows total duration.
+- One-click reset: “Restart” button at the top-right of task page resets current task progress.
+- History page: pick any date, view pending/completed tasks, and start any task directly.
+- Spaced repetition review: auto-generates review tasks for day 1/3/7/14/30 (both quiz modes).
+
+### 3. How to Run
+Recommended: run a local static server with Python:
+
+```bash
+cd /path/to/ielts_spelling_test
+python3 -m http.server 8000 --bind 127.0.0.1
+```
+
+Open in browser:
+
+- http://127.0.0.1:8000
+
+You may also open `index.html` directly, but some browsers may restrict local-file behavior. The server method is preferred.
+
+### 4. Typical Workflow
+1. Open “Today Tasks” and start daily training.
+2. Complete both quiz types (spelling + multiple choice).
+3. During a task, you can:
+   - Use “Next” to skip unanswered words (they return later).
+   - Use top-right “Restart” to reset the current task.
+4. Switch to “History Tasks” to:
+   - Pick any date.
+   - View pending/completed tasks.
+   - Start or redo any task directly.
+
+### 5. Storage
+The app stores data in browser `localStorage`, including:
+- Daily 30-word allocation progress
+- Historical word-set mapping
+- Task completion states
+
+If site data is cleared, all progress is reset.
+
+### 6. Word List Update
+- Source text: `IELTS Word List.txt`
+- Runtime data file: `wordlist.js`
+- Generator script: `generate_wordlist.py`
+
+After replacing the source TXT, run:
+
+```bash
+cd /path/to/ielts_spelling_test
+python3 generate_wordlist.py
+```
+
+Then refresh the browser.
+
+### 7. File Structure
+- `index.html`: page structure and containers.
+- `styles.css`: Liquid Glass UI styles.
+- `app.js`: task logic, quiz flow, timer, history page, and review scheduling.
+- `wordlist.js`: generated vocabulary data.
+- `generate_wordlist.py`: parses word/meaning/phonetic/POS from TXT and rebuilds JS data.
