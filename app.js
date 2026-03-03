@@ -351,7 +351,7 @@
       top.className = 'task-top';
       const name = document.createElement('div');
       name.className = 'task-name';
-      name.textContent = `${g.label} 复习任务`;
+      name.textContent = `${g.label}`;
       const tag = document.createElement('span');
       tag.className = `tag${spellDone && choiceDone ? ' done' : ''}`;
       tag.textContent = spellDone && choiceDone ? '已完成' : '可练习';
