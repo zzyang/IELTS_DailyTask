@@ -37,6 +37,9 @@ python3 -m http.server 8000 --bind 127.0.0.1
 
 也可直接打开 `index.html`，但部分浏览器环境可能受本地文件策略影响，建议优先使用上面的方式。
 
+### 在线访问（GitHub Pages）
+- 部署后可直接访问：`https://zzyang.github.io/IELTS_DailyTask/`
+
 ### 4. 数据与存储
 应用使用浏览器 `localStorage` 保存以下数据：
 - 每日 30 词分配进度
@@ -104,6 +107,9 @@ Open in browser:
 - http://127.0.0.1:8000
 
 You may also open `index.html` directly, but some browsers may restrict local-file behavior.
+
+### Online Access (GitHub Pages)
+- After deployment, use: `https://zzyang.github.io/IELTS_DailyTask/`
 
 ### 4. Storage
 The app stores progress in browser `localStorage`, including:
